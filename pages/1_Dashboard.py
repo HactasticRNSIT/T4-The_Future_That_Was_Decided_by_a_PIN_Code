@@ -2,125 +2,194 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from data.districts import district_data
 
-# ---------------- UI STYLE ----------------
-st.markdown("""
-<style>
-h1, h2 {
-    color: #0f172a;
-}
+st.set_page_config(layout="wide")
 
-section[data-testid="stSidebar"] {
-    background-color: #0f172a;
-}
+st.title("🌍 Climate Risk Intelligence Dashboard")
 
-div[data-testid="metric-container"] {
-    background-color: white;
-    border-radius: 14px;
-    padding: 15px;
-    box-shadow: 0px 4px 12px rgba(0,0,0,0.08);
-}
-</style>
-""", unsafe_allow_html=True)
+# =========================
+# RISK ENGINE (UPGRADED)
+# =========================
+def compute_risk(data):
+    risk = 0
+    breakdown = {}
 
-st.title("📊 District Intelligence Dashboard")
+    # AQI (Air pollution)
+    breakdown["Air Quality"] = min(data["aqi"] / 5, 30)
+    risk += breakdown["Air Quality"]
 
+    # Temperature (climate stress)
+    temp_score = 0
+    if data["temp"] > 38:
+        temp_score = 25
+    elif data["temp"] > 33:
+        temp_score = 15
+    breakdown["Temperature"] = temp_score
+    risk += temp_score
+
+    # Rainfall (water stress)
+    rainfall_score = {
+        "Very Low": 20,
+        "Low": 15,
+        "Moderate": 10,
+        "High": 5
+    }.get(data["rainfall"], 10)
+
+    breakdown["Water Stress"] = rainfall_score
+    risk += rainfall_score
+
+    # Transport impact
+    transport_score = 20 if "traffic pollution" in data["risk_factors"] else 5
+    breakdown["Transport"] = transport_score
+    risk += transport_score
+
+    # Industrial impact
+    industrial_score = 20 if "industrial pollution" in data["risk_factors"] else 5
+    breakdown["Industry"] = industrial_score
+    risk += industrial_score
+
+    # Social/urban pressure (estimated factor)
+    social_score = 10
+    breakdown["Urban Pressure"] = social_score
+    risk += social_score
+
+    return min(risk, 100), breakdown
+
+# =========================
+# EDUCATION IMPACT
+# =========================
+def education_impact(risk):
+    if risk >= 75:
+        return "🔴 Severe disruption to learning (health + attendance affected)"
+    elif risk >= 50:
+        return "🟠 Moderate learning disruption"
+    return "🟢 Low educational impact"
+
+# =========================
+# ACTION SYSTEM (NEW)
+# =========================
+def action_plan(risk, data):
+    actions = []
+
+    if risk >= 75:
+        actions.append("Immediate government intervention required")
+        actions.append("Install air quality control systems in schools")
+        actions.append("Heat safety protocols for students")
+
+    if data["aqi"] > 120:
+        actions.append("Reduce traffic emissions near schools")
+
+    if data["temp"] > 38:
+        actions.append("Shift school timings to early morning")
+
+    if "industrial pollution" in data["risk_factors"]:
+        actions.append("Relocate schools away from industrial zones")
+
+    if not actions:
+        actions.append("Maintain monitoring — risk currently manageable")
+
+    return actions
+
+# =========================
+# RANK ALL DISTRICTS
+# =========================
+def rank_districts():
+    ranking = []
+    for d in district_data:
+        r, _ = compute_risk(district_data[d])
+        ranking.append((d, r))
+    return sorted(ranking, key=lambda x: x[1], reverse=True)
+
+# =========================
+# UI INPUT
+# =========================
 district = st.selectbox("Select District", list(district_data.keys()))
 data = district_data[district]
 
-# ---------------- RISK ENGINE ----------------
-def risk(data):
-    r = 0
+risk, breakdown = compute_risk(data)
 
-    if data["aqi"] > 150:
-        r += 30
-    elif data["aqi"] > 100:
-        r += 20
+# =========================
+# TOP KPIs
+# =========================
+st.markdown("## 📊 Key Indicators")
 
-    if data["temp"] > 38:
-        r += 30
-    elif data["temp"] > 33:
-        r += 15
+col1, col2, col3 = st.columns(3)
 
-    if "traffic pollution" in data["risk_factors"]:
-        r += 20
-
-    if "industrial pollution" in data["risk_factors"]:
-        r += 20
-
-    return min(r, 100)
-
-def education(r):
-    if r > 70:
-        return "Severe disruption in learning environment"
-    elif r > 40:
-        return "Moderate education impact"
-    return "Low impact"
-
-def explain(data, r):
-    reasons = []
-
-    if data["aqi"] > 120:
-        reasons.append("Air pollution affecting children health")
-
-    if data["temp"] > 38:
-        reasons.append("Extreme heat reduces school attendance")
-
-    if "traffic pollution" in data["risk_factors"]:
-        reasons.append("Transport emissions increase exposure")
-
-    if r > 70:
-        reasons.append("Combined environmental stress is critical")
-
-    return reasons
-
-# ---------------- CALC ----------------
-score = risk(data)
-
-# ---------------- CARDS ----------------
-st.markdown("## 📌 Key Metrics")
-
-c1, c2, c3 = st.columns(3)
-
-with c1:
+with col1:
     st.metric("AQI", data["aqi"])
 
-with c2:
+with col2:
     st.metric("Temperature", f'{data["temp"]}°C')
 
-with c3:
-    st.metric("Risk Score", score)
+with col3:
+    st.metric("Risk Score", risk)
 
 st.markdown("---")
 
-# ---------------- RISK FACTORS ----------------
-st.markdown("## ⚠ Risk Factors")
+# =========================
+# RISK BREAKDOWN
+# =========================
+st.markdown("## 🧠 Risk Breakdown (What contributes?)")
 
-for r in data["risk_factors"]:
-    st.write("✔", r)
-
-st.markdown("---")
-
-# ---------------- EXPLANATION ----------------
-st.markdown("## 🧠 Why this risk?")
-
-for r in explain(data, score):
-    st.write("•", r)
-
-st.success(education(score))
+for k, v in breakdown.items():
+    st.write(f"• **{k}** → {round(v,1)} score")
 
 st.markdown("---")
 
-# ---------------- CHART ----------------
-st.markdown("## 📊 Risk Overview")
+# =========================
+# EDUCATION IMPACT
+# =========================
+st.markdown("## 📚 Education Impact")
 
-districts = list(district_data.keys())
-values = []
+st.success(education_impact(risk))
 
-for d in districts:
-    values.append(risk(district_data[d]))
+st.markdown("---")
+
+# =========================
+# ACTION PLAN
+# =========================
+st.markdown("## 🚨 Recommended Actions")
+
+for a in action_plan(risk, data):
+    st.write("✔", a)
+
+st.markdown("---")
+
+# =========================
+# HIGHEST RISK DISTRICT
+# =========================
+st.markdown("## 🔥 Highest Risk District in Karnataka")
+
+ranking = rank_districts()
+top_district, top_risk = ranking[0]
+
+st.error(f"🔴 {top_district} → Risk Score: {top_risk}")
+
+st.markdown("---")
+
+# =========================
+# FULL RANKING
+# =========================
+st.markdown("## 📊 District Risk Ranking")
+
+for d, r in ranking:
+    if r >= 75:
+        st.error(f"{d} → {r}")
+    elif r >= 50:
+        st.warning(f"{d} → {r}")
+    else:
+        st.success(f"{d} → {r}")
+
+st.markdown("---")
+
+# =========================
+# CHART
+# =========================
+st.markdown("## 📈 Visualization")
 
 fig, ax = plt.subplots()
-ax.bar(districts, values)
+ax.bar([x[0] for x in ranking], [x[1] for x in ranking])
 plt.xticks(rotation=90)
+ax.set_ylabel("Risk Score")
+ax.set_title("District Risk Comparison")
 
 st.pyplot(fig)
