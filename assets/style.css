@@ -1,0 +1,28 @@
+/* Background */
+body {
+    background-color: #f4f6f9;
+    font-family: Arial;
+}
+
+/* Title */
+h1 {
+    color: #1f4e79;
+    font-weight: 800;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #1f4e79;
+}
+
+section[data-testid="stSidebar"] * {
+    color: white;
+}
+
+/* Metric cards */
+div[data-testid="metric-container"] {
+    background-color: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0px 3px 10px rgba(0,0,0,0.1);
+}
